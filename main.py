@@ -1,5 +1,6 @@
 import argparse
 from scripting import *
+import numpy as np
 
 
 sample_rate = 48000

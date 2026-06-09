@@ -65,14 +65,27 @@ def parse_script(lines):
                     continue
                 pos = np.array([float(coords[0]), float(coords[1])])
 
-                freq_match = re.search(r'FREQ=([0-9.]+)', line)
+                #freq_match = re.search(r'FREQ=([0-9.]+)', line)
+                freq_match = re.search(r'FREQ=([0-9.,:]+)', line)
                 amp_match = re.search(r'AMP=([0-9.]+)', line)
 
                 if not freq_match or not amp_match:
                     print(f"Warning: Missing FREQ or AMP in SOUND command: {line}")
                     continue
 
-                freq = float(freq_match.group(1))
+                freq_string = freq_match.group(1)
+                ### New Here
+                if ':' in freq_string:
+                    freqs = []
+
+                    for item in freq_string.split(','):
+                        freq, weight = item.split(':')
+                        freqs.append((float(freq), float(weight)))
+
+                    freq = freqs
+                else:
+                    freq = float(freq_string)
+                ###
                 amp = float(amp_match.group(1))
                 actions.append(('SOUND', pos, freq, amp))
             except (ValueError, IndexError):
@@ -108,7 +121,11 @@ def execute(actions, with_visualization=False):
         elif cmd == 'SOUND':
             _, pos, freq, amp = act
             # Generate and play the sound
-            spatialiser.audio_engine.play_tone(pos, freq, amp)
+            #spatialiser.audio_engine.play_tone(pos, freq, amp)
+            if isinstance(freq, list):
+                spatialiser.audio_engine.play_weighted_tone(pos, freq, amp)
+            else:
+                spatialiser.audio_engine.play_tone(pos, freq, amp)
 
 
 

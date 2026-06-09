@@ -39,7 +39,6 @@ class SpeakerConfig:
                 }
                 self.speakers.append(speaker)
 
-        print(f"Created default {self.grid_size}x{self.grid_size} grid with channels 0-{len(self.speakers) - 1}")
 
     def parse_config_line(self, line):
         """Parse a single configuration line."""

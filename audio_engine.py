@@ -272,8 +272,35 @@ class MultiSpeakerAudioEngine:
                 else:
                     print(
                         f"WARNING: Speaker {speaker['id']} channel {channel} exceeds available channels (0-{self.num_channels - 1})")
-
         return output
+
+    """ NEW ADDITION"""
+
+    def generate_weighted_tone(self, source_pos, freqs_and_weights, amp):
+        N = int(self.tone_duration * self.sample_rate)
+        t = np.arange(N) / self.sample_rate
+        tone = np.zeros(N)
+
+        for freq, weight in freqs_and_weights:
+            tone += weight * np.sin(2 * np.pi * freq * t)
+
+        # Normalise
+        peak = np.max(np.abs(tone))
+        if peak > 0:
+            tone /= peak
+
+        tone *= amp
+
+        gains, delays = self.spat_engine.calculate_gains_delays(source_pos)
+        output = np.zeros((N, self.num_channels))
+
+        for i, speaker in enumerate(self.config.speakers):
+            channel = speaker['channel']
+
+            if gains[i] > 0.001:
+                output[:, channel] = tone * gains[i]
+        return output
+
 
     def play_tone(self, source_pos, freq, amp):
         """Play a tone at the specified position."""
@@ -289,3 +316,17 @@ class MultiSpeakerAudioEngine:
             except Exception as e:
                 print(f"Error writing to audio stream: {e}")
         return buffer
+
+    """ NEW ADDITION """
+    def play_weighted_tone(self, source_pos, freqs_and_weights, amp):
+        print(
+            f"Weighted tone @ {source_pos}: "
+            f"{[f for f, _ in freqs_and_weights]}"
+        )
+        buffer = self.generate_weighted_tone(
+            source_pos,
+            freqs_and_weights,
+            amp
+        )
+        if self.stream:
+            self.stream.write(buffer.astype('float32'))
