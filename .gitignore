@@ -1,0 +1,42 @@
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# Virtual Environments & Packages
+.venv/
+venv/
+ENV/
+env/
+/bin/
+/lib/
+/include/
+/pip-selfcheck.json
+poetry.lock
+Pipfile.lock
+
+
+# Audio/Hardware Diagnostics & Profiles
+*.wav
+*.mp3
+*.raw
+*.pcm
+.audio_device_cache
+
+# Text Files
+*.txt
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs and Runtime Traces
+*.log
+crash_dump.txt
