@@ -64,10 +64,9 @@ def parse_script(lines):
                     print(f"Warning: Invalid SOUND coordinates: {line}")
                     continue
                 pos = np.array([float(coords[0]), float(coords[1])])
-
-                #freq_match = re.search(r'FREQ=([0-9.]+)', line)
                 freq_match = re.search(r'FREQ=([0-9.,:]+)', line)
                 amp_match = re.search(r'AMP=([0-9.]+)', line)
+                duration_match = re.search(r'DURATION=([0-9.]+)', line)
 
                 if not freq_match or not amp_match:
                     print(f"Warning: Missing FREQ or AMP in SOUND command: {line}")
@@ -87,7 +86,12 @@ def parse_script(lines):
                     freq = float(freq_string)
                 ###
                 amp = float(amp_match.group(1))
-                actions.append(('SOUND', pos, freq, amp))
+                duration = (
+                    float(duration_match.group(1))
+                    if duration_match
+                    else None
+                )
+                actions.append(('SOUND', pos, freq, amp, duration))
             except (ValueError, IndexError):
                 print(f"Warning: Invalid SOUND command: {line}")
                 continue
@@ -97,7 +101,7 @@ def parse_script(lines):
     return actions
 
 
-def execute(actions, with_visualization=False):
+def execute(actions):
     """Execute a sequence of parsed actions."""
     # Use existing spatialiser if available, otherwise create one with warning
     if hasattr(main.generate_tactile_tone, 'spatialiser') and main.generate_tactile_tone.spatialiser:
@@ -119,13 +123,28 @@ def execute(actions, with_visualization=False):
             time.sleep(act[1])
 
         elif cmd == 'SOUND':
-            _, pos, freq, amp = act
-            # Generate and play the sound
-            #spatialiser.audio_engine.play_tone(pos, freq, amp)
-            if isinstance(freq, list):
-                spatialiser.audio_engine.play_weighted_tone(pos, freq, amp)
-            else:
-                spatialiser.audio_engine.play_tone(pos, freq, amp)
+            _, pos, freq, amp, duration = act
+            old_duration = spatialiser.audio_engine.tone_duration
+            if duration is not None:
+                spatialiser.audio_engine.tone_duration = duration
 
-
+            try:
+                print(
+                    "Duration before play:",
+                    spatialiser.audio_engine.tone_duration
+                )
+                if isinstance(freq, list):
+                    spatialiser.audio_engine.play_weighted_tone(
+                        pos,
+                        freq,
+                        amp
+                    )
+                else:
+                    spatialiser.audio_engine.play_tone(
+                        pos,
+                        freq,
+                        amp
+                    )
+            finally:
+                spatialiser.audio_engine.tone_duration = old_duration
 

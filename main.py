@@ -23,7 +23,7 @@ def generate_tactile_tone(source_pos, freq, amp):
         tone = amp * np.sin(2 * np.pi * freq * t)
 
         # Simple stereo panning
-        pan = np.clip(source_pos[0] + 0.5, 0, 1)  # -0.5 to 0.5 -> 0 to 1
+        pan = np.clip(source_pos[0] + 0.5, 0, 1)
         left = tone * (1 - pan)
         right = tone * pan
 

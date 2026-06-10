@@ -66,25 +66,6 @@ class MultiSpeakerSpatialiser:
         """Stop the audio system."""
         self.audio_engine.stop_stream()
 
-    def print_startup_info(self):
-        """Print startup information."""
-        # print(f"Multi-Speaker Spatialiser Ready!")
-        # print(f"  Configuration: {self.speaker_config.config_name}")
-        # print(f"  Speakers: {len(self.speaker_config.speakers)}")
-        # print(f"  Channels: {self.audio_engine.num_channels} (0-based: 0 to {self.audio_engine.num_channels - 1})")
-        # print(f"  Method: {self.speaker_config.method}")
-        # if self.audio_engine.device_id is not None:
-        #     print(f"  Audio Device: {self.audio_engine.device_id}")
-        # if self.speaker_config.speakers:
-        #     positions = self.speaker_config.get_speaker_positions()
-        #     x_range = np.ptp(positions[:, 0]) * 1000  # Convert to mm
-        #     y_range = np.ptp(positions[:, 1]) * 1000
-        #     print(f"  Coverage: {x_range:.1f}mm x {y_range:.1f}mm")
-
-        # Print tactile grid improvement message
-        # if self.speaker_config.method == 'tactile_grid':
-        #     print("  IMPROVED: Smooth tactile grid spatialization (no more clicking/jumping)")
-
     def print_info(self):
         """Print detailed configuration information."""
         self.speaker_config.print_info()

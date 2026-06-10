@@ -6,6 +6,7 @@ from spatialisation import SpatializationEngine
 
 class MultiSpeakerAudioEngine:
     def __init__(self, speaker_config, sample_rate=48000, device_id=None):
+        # sample rate (not sure if I should change this as well)
         self.config = speaker_config
         self.sample_rate = sample_rate
         self.device_id = device_id  # Store preferred device ID
@@ -15,7 +16,7 @@ class MultiSpeakerAudioEngine:
         self._user_specified_device = device_id is not None
 
         # Audio parameters
-        self.tone_duration = 0.1
+        self.tone_duration = 0.1 # here needs to change (should not set 0.1 by default)
         self.fade_duration = 0.05
         self.fade_len = int(self.fade_duration * sample_rate)
 
@@ -279,6 +280,8 @@ class MultiSpeakerAudioEngine:
     def generate_weighted_tone(self, source_pos, freqs_and_weights, amp):
         N = int(self.tone_duration * self.sample_rate)
         t = np.arange(N) / self.sample_rate
+        print("tone_duration =", self.tone_duration)
+        print("N =", N)
         tone = np.zeros(N)
 
         for freq, weight in freqs_and_weights:
@@ -319,14 +322,18 @@ class MultiSpeakerAudioEngine:
 
     """ NEW ADDITION """
     def play_weighted_tone(self, source_pos, freqs_and_weights, amp):
-        print(
-            f"Weighted tone @ {source_pos}: "
-            f"{[f for f, _ in freqs_and_weights]}"
-        )
         buffer = self.generate_weighted_tone(
             source_pos,
             freqs_and_weights,
             amp
         )
-        if self.stream:
-            self.stream.write(buffer.astype('float32'))
+        if self.stream is None:
+            self.start_stream()
+
+        if self.stream is not None:
+            try:
+                self.stream.write(buffer.astype('float32'))
+            except Exception as e:
+                print(f"Error writing to audio stream: {e}")
+
+        return buffer
