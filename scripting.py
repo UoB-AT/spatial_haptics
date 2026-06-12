@@ -137,6 +137,26 @@ def parse_script(lines):
                 actions.append(('CHANNELS', channels, freqs, amp, duration))
             except Exception as e:
                 print( f"Warning: Invalid CHANNELS syntax: {e}")
+
+        elif cmd == 'MULTI':
+            try:
+                amp_match = re.search(r'AMP=([0-9.]+)', line)
+                duration_match = re.search(r'DURATION=([0-9.]+)', line)
+                amp = float(amp_match.group(1))
+                duration = float(duration_match.group(1))
+                assignments = {}
+                matches = re.findall(r'CH(\d+)=([0-9.,:]+)', line)
+                for ch_str, freq_string in matches:
+                    channel = int(ch_str)
+                    freqs = []
+                    for item in freq_string.split(','):
+                        freq, weight = item.split(':')
+                        freqs.append((float(freq), float(weight)))
+                    assignments[channel] = freqs
+                actions.append(('MULTI', assignments, amp, duration))
+            except Exception as e:
+                print(f"MULTI parse error: {e}")
+
     return actions
 
 
@@ -169,7 +189,7 @@ def execute(actions, spatialiser):
                 #timestamp = int(time.time())
                 #txt_filename = f"output/audio_output_{tone_type}_{timestamp}.txt"
                 # np.savetxt(txt_filename, buffer, fmt='%.6f', delimiter=',')
-                print(f"✓ Audio array saved to text file: {txt_filename}")
+                #print(f"✓ Audio array saved to text file: {txt_filename}")
             finally:
                 spatialiser.audio_engine.tone_duration = old_duration
 
@@ -199,5 +219,15 @@ def execute(actions, spatialiser):
                 spatialiser.audio_engine.tone_duration = duration
             try:
                 buffer = (spatialiser.audio_engine.play_multi_channel(channels, freqs, amp))
+            finally:
+                spatialiser.audio_engine.tone_duration = old_duration
+
+        elif cmd == 'MULTI':
+            _, assignments, amp, duration = act
+            old_duration = (spatialiser.audio_engine.tone_duration)
+            if duration is not None:
+                spatialiser.audio_engine.tone_duration = duration
+            try:
+                spatialiser.audio_engine.play_multi_independent(assignments, amp)
             finally:
                 spatialiser.audio_engine.tone_duration = old_duration

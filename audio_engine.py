@@ -358,6 +358,21 @@ class MultiSpeakerAudioEngine:
             output[:, ch - 1] = tone
         return output
 
+    def generate_multi_independent(self, assignments, amp):
+        N = int(self.tone_duration * self.sample_rate)
+        t = np.arange(N) / self.sample_rate
+        output = np.zeros((N, self.num_channels))
+        for channel, freqs in assignments.items():
+            tone = np.zeros(N)
+            for freq, weight in freqs:
+                tone += (weight * np.sin(2*np.pi*freq*t))
+            peak = np.max(np.abs(tone))
+            if peak > 0:
+                tone /= peak
+            tone *= amp
+            output[:, channel - 1] = tone
+        return output
+
     def play_direct_channel(self, channel, freqs_and_weights, amp):
         buffer = self.generate_direct_channel_tone(
             channel,
@@ -387,6 +402,13 @@ class MultiSpeakerAudioEngine:
             freqs_and_weights,
             amp
         )
+        if self.stream is None:
+            self.start_stream()
+        self.stream.write(buffer.astype('float32'))
+        return buffer
+
+    def play_multi_independent(self, assignments, amp):
+        buffer = self.generate_multi_independent(assignments, amp)
         if self.stream is None:
             self.start_stream()
         self.stream.write(buffer.astype('float32'))
