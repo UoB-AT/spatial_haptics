@@ -26,14 +26,12 @@ class MultiSpeakerSpatialiser:
         """Load configuration from file."""
         success = self.speaker_config.load_from_file(config_file)
         if success:
-            # Preserve device_id when reloading
             device_id = getattr(self.audio_engine, 'device_id', None) if hasattr(self, 'audio_engine') else None
 
             if hasattr(self, 'audio_engine') and self.audio_engine:
                 self.audio_engine.stop_stream()
 
             self.audio_engine = MultiSpeakerAudioEngine(self.speaker_config, device_id=device_id)
-            # print(f"Loaded configuration from {config_file}")
         return success
 
     def save_config(self, config_file):

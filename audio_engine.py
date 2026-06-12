@@ -298,18 +298,6 @@ class MultiSpeakerAudioEngine:
         output[:, channel - 1] = tone
         return output
 
-    # def play_direct_channel(self, channel, freqs_and_weights, amp):
-    #     buffer = self.generate_direct_channel_tone(
-    #         channel,
-    #         freqs_and_weights,
-    #         amp
-    #     )
-    #     if self.stream is None:
-    #         self.start_stream()
-    #     if self.stream is not None:
-    #         self.stream.write(buffer.astype('float32'))
-    #     return buffer
-
     def play_tone(self, source_pos, freq, amp):
         buffer = self.generate_tone(source_pos, freq, amp)
 
@@ -355,6 +343,21 @@ class MultiSpeakerAudioEngine:
             print("✗ Error: Could not write audio data because stream failed to initialize.")
         return buffer
 
+    def generate_multi_channel_tone(self, channels, freqs_and_weights, amp):
+        N = int(self.tone_duration * self.sample_rate)
+        t = np.arange(N) / self.sample_rate
+        tone = np.zeros(N)
+        for freq, weight in freqs_and_weights:
+            tone += weight * np.sin(2 * np.pi * freq * t)
+        peak = np.max(np.abs(tone))
+        if peak > 0:
+            tone /= peak
+        tone *= amp
+        output = np.zeros((N, self.num_channels))
+        for ch in channels:
+            output[:, ch - 1] = tone
+        return output
+
     def play_direct_channel(self, channel, freqs_and_weights, amp):
         buffer = self.generate_direct_channel_tone(
             channel,
@@ -362,7 +365,6 @@ class MultiSpeakerAudioEngine:
             amp
         )
 
-        # FIX: Ensure stream is started safely
         if self.stream is None:
             self.start_stream()
 
@@ -377,4 +379,15 @@ class MultiSpeakerAudioEngine:
                 print(f"Error writing to audio stream: {e}")
         else:
             print("✗ Error: Could not write audio data because stream failed to initialize.")
+        return buffer
+
+    def play_multi_channel(self, channels, freqs_and_weights, amp):
+        buffer = self.generate_multi_channel_tone(
+            channels,
+            freqs_and_weights,
+            amp
+        )
+        if self.stream is None:
+            self.start_stream()
+        self.stream.write(buffer.astype('float32'))
         return buffer

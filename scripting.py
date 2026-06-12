@@ -115,6 +115,28 @@ def parse_script(lines):
             except (ValueError, IndexError, AttributeError) as e:
                 print(f"Warning: Invalid CHANNEL syntax block: {line}. Error: {e}")
                 continue
+        elif cmd == 'CHANNELS':
+            try:
+                channels = [int(ch) for ch in parts[1].split(',')]
+                freq_match = re.search(r'FREQ=([0-9.,:]+)', line)
+                amp_match = re.search(r'AMP=([0-9.]+)', line)
+                duration_match = re.search(r'DURATION=([0-9.]+)', line)
+                freq_string = freq_match.group(1)
+
+                freqs = []
+
+                for item in freq_string.split(','):
+                    freq, weight = item.split(':')
+                    freqs.append((float(freq), float(weight)))
+                amp = float(amp_match.group(1))
+                duration = (
+                    float(duration_match.group(1))
+                    if duration_match
+                    else None
+                )
+                actions.append(('CHANNELS', channels, freqs, amp, duration))
+            except Exception as e:
+                print( f"Warning: Invalid CHANNELS syntax: {e}")
     return actions
 
 
@@ -142,19 +164,16 @@ def execute(actions, spatialiser):
                 else:
                     buffer = spatialiser.audio_engine.play_tone(pos, freq, amp)
                     tone_type = "standard"
+                #time.sleep(spatialiser.audio_engine.tone_duration)
 
-                # --- FIX 1: Wait for the sound to finish playing ---
-                time.sleep(spatialiser.audio_engine.tone_duration)
-
-                timestamp = int(time.time())
-                txt_filename = f"output/audio_output_{tone_type}_{timestamp}.txt"
-                np.savetxt(txt_filename, buffer, fmt='%.6f', delimiter=',')
+                #timestamp = int(time.time())
+                #txt_filename = f"output/audio_output_{tone_type}_{timestamp}.txt"
+                # np.savetxt(txt_filename, buffer, fmt='%.6f', delimiter=',')
                 print(f"✓ Audio array saved to text file: {txt_filename}")
             finally:
                 spatialiser.audio_engine.tone_duration = old_duration
 
         elif cmd == 'CHANNEL':
-
             _, channel, freqs, amp, duration = act
             old_duration = spatialiser.audio_engine.tone_duration
 
@@ -167,10 +186,18 @@ def execute(actions, spatialiser):
                     amp
                 )
 
-                time.sleep(spatialiser.audio_engine.tone_duration)
-                timestamp = int(time.time())
-                txt_filename = f"output/audio_output_channel_{timestamp}.txt"
-                np.savetxt(txt_filename, buffer, fmt='%.6f', delimiter=',')
+                #timestamp = int(time.time())
+                #txt_filename = f"output/audio_output_channel_{timestamp}.txt"
+                #np.savetxt(txt_filename, buffer, fmt='%.6f', delimiter=',')
+            finally:
+                spatialiser.audio_engine.tone_duration = old_duration
 
+        elif cmd == 'CHANNELS':
+            _, channels, freqs, amp, duration = act
+            old_duration = spatialiser.audio_engine.tone_duration
+            if duration is not None:
+                spatialiser.audio_engine.tone_duration = duration
+            try:
+                buffer = (spatialiser.audio_engine.play_multi_channel(channels, freqs, amp))
             finally:
                 spatialiser.audio_engine.tone_duration = old_duration
