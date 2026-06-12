@@ -33,6 +33,12 @@ class MultiSpeakerAudioEngine:
         else:
             print("No device specified, will auto-select suitable device")
 
+    def set_parameters(self, **kwargs):
+        """Allow external scripts to update the tone_duration."""
+        if 'tone_duration' in kwargs:
+            self.tone_duration = float(kwargs['tone_duration'])
+            print(f"✓ Audio Engine: tone_duration updated to {self.tone_duration}s")
+
     def validate_device_selection(self):
         """Validate that the specified device exists and has enough channels."""
         if self.device_id is None:
@@ -77,89 +83,71 @@ class MultiSpeakerAudioEngine:
                 self.spat_engine.set_parameters(**{key: value})
 
     def start_stream(self):
-        """Start the audio output stream with STRICT device selection - FIXED VERSION."""
+        """Start the PortAudio output stream cleanly."""
         with self.lock:
-            if self.stream is None:
-                # If user specified a device, ONLY try that device
-                if self.device_id is not None:
-                    print(f"Attempting to use specified device {self.device_id}...")
-                    if self._try_device(self.device_id):
+            if self.stream is not None:
+                return  # Stream is already active
+
+            try:
+                devices = sd.query_devices()
+            except Exception as e:
+                print(f"Error querying audio devices: {e}")
+                return
+
+            # Case A: A strict device ID was explicitly passed via CLI (--device X)
+            if self.device_id is not None:
+                try:
+                    dev_info = devices[self.device_id]
+                    device_name = dev_info.get('name', 'Unknown Device')
+
+                    # Pass ALL 3 required arguments
+                    success = self._try_device(self.device_id, device_name, devices)
+                    if success:
                         return
-                    else:
-                        # User's device failed - don't fallback, tell them
-                        print(f"ERROR: Cannot use specified device {self.device_id}")
-                        print("Use --list-devices to see available devices")
-                        print("Use --test-device ID to test a specific device")
-                        print("Use --select-device for interactive selection")
-                        self.stream = None
+                except IndexError:
+                    print(f"Error: Specified device ID {self.device_id} is out of bounds.")
+
+            # Case B: No device specified or explicit selection failed; auto-detect
+            print("Searching for a suitable Core Audio/MCHStreamer device...")
+            for idx, dev in enumerate(devices):
+                # Target the MCHStreamer or matching high-channel layout
+                if 'mchstreamer' in dev['name'].lower() or 'mch' in dev['name'].lower():
+                    # Pass ALL 3 required arguments here too
+                    success = self._try_device(idx, dev['name'], devices)
+                    if success:
+                        self.device_id = idx  # Save it for future reference
                         return
 
-                # No device specified by user - try defaults and auto-select
-                print("No device specified, trying default device...")
-                if self._try_device(None):
-                    return
+            # Case C: Hard fallback to system default output if no target hardware is auto-detected
+            try:
+                default_id = sd.default.device[1]  # Default output index
+                default_name = devices[default_id]['name']
+                print(f"Falling back to default system device: {default_name}")
 
-                # Default failed, auto-select suitable device
-                print("Default device failed, searching for suitable device...")
-                if self._auto_select_device():
-                    return
-
-                # Complete failure
-                print("No suitable audio device found.")
-                print("Use --list-devices to see available devices")
-                print("Use --device ID to specify a device")
-                self.stream = None
+                # Pass ALL 3 required arguments
+                self._try_device(default_id, default_name, devices)
+                self.device_id = default_id
+            except Exception as fallback_err:
+                print(f"Critical: All stream initialization paths failed: {fallback_err}")
 
     # SIMPLE FIX: Add this method to MultiSpeakerAudioEngine class in multispeaker_main.py
-
-    def _try_device(self, device_id):
-        """Try to start stream with specific device - MCHSTREAMER WINDOWS FIX."""
+    def _try_device(self, device_id, device_name, devices):
+        """Internal helper to attempt opening a stream on a specific device."""
         try:
-            device_name = "default"
-            if device_id is not None:
-                devices = sd.query_devices()
-                if 0 <= device_id < len(devices):
-                    device = devices[device_id]
-                    device_name = device['name']
-                    available_channels = device['max_output_channels']
-
-                    # MCHSTREAMER FIX: Try WASAPI for MCHStreamer devices
-                    if 'mchstreamer' in device_name.lower() or 'mch' in device_name.lower():
-                        print(f"MCHStreamer device detected, trying WASAPI API...")
-                        try:
-                            # Find WASAPI host API
-                            host_apis = sd.query_hostapis()
-                            wasapi_hostapi = None
-                            for i, api in enumerate(host_apis):
-                                if 'WASAPI' in api['name']:
-                                    wasapi_hostapi = i
-                                    break
-
-                            if wasapi_hostapi is not None:
-                                self.stream = sd.OutputStream(
-                                    samplerate=self.sample_rate,
-                                    channels=self.num_channels,
-                                    dtype='float32',
-                                    blocksize=1024,
-                                    device=device_id,
-                                    hostapi=wasapi_hostapi  # Force WASAPI
-                                )
-                                self.stream.start()
-                                print(
-                                    f"✓ MCHStreamer WASAPI: {device_name} ({self.num_channels} channels at {self.sample_rate}Hz)")
-                                return True
-                        except Exception as wasapi_error:
-                            print(f"WASAPI failed: {wasapi_error}, trying default...")
-
-                    # Check if device has enough channels
-                    if available_channels < self.num_channels:
-                        print(
-                            f"WARNING: Device {device_id} ({device_name}) only has {available_channels} channels, need {self.num_channels}")
-                else:
-                    print(f"ERROR: Invalid device ID {device_id} (valid range: 0-{len(devices) - 1})")
-                    return False
-
-            # Default method
+            # Check if this is an MCHStreamer device (Core Audio / WASAPI)
+            if 'mchstreamer' in device_name.lower() or 'mch' in device_name.lower():
+                print(f"MCHStreamer detected! Applying specific hardware channel mapping...")
+                self.stream = sd.OutputStream(
+                    samplerate=self.sample_rate,
+                    channels=self.num_channels,  # Strict 16 channels
+                    dtype='float32',
+                    blocksize=1024,
+                    device=device_id
+                )
+                self.stream.start()
+                print(f"✓ Audio stream successfully locked: {device_name} (Device {device_id})")
+                return True
+            # Standard fallback for standard stereo outputs (like MacBook Speakers)
             self.stream = sd.OutputStream(
                 samplerate=self.sample_rate,
                 channels=self.num_channels,
@@ -172,15 +160,8 @@ class MultiSpeakerAudioEngine:
             return True
 
         except Exception as e:
-            if device_id is not None:
-                print(f"✗ Device {device_id} ({device_name}) failed: {e}")
-
-                # MCHSTREAMER HELPFUL MESSAGE
-                if 'mchstreamer' in device_name.lower() and 'WDM-KS' in str(e):
-                    print(f"💡 MCHStreamer Windows fix: Try using device 11 instead")
-                    print(f"   Command: python multispeaker_main.py --device 11")
-            else:
-                print(f"✗ Default device failed: {e}")
+            print(f"✗ Device {device_id} failed: {e}")
+            self.stream = None
             return False
 
     def _auto_select_device(self):
@@ -280,8 +261,6 @@ class MultiSpeakerAudioEngine:
     def generate_weighted_tone(self, source_pos, freqs_and_weights, amp):
         N = int(self.tone_duration * self.sample_rate)
         t = np.arange(N) / self.sample_rate
-        print("tone_duration =", self.tone_duration)
-        print("N =", N)
         tone = np.zeros(N)
 
         for freq, weight in freqs_and_weights:
@@ -304,36 +283,98 @@ class MultiSpeakerAudioEngine:
                 output[:, channel] = tone * gains[i]
         return output
 
+    def generate_direct_channel_tone(self, channel, freqs_and_weights, amp):
+        N = int(self.tone_duration * self.sample_rate)
+        t = np.arange(N) / self.sample_rate
+        tone = np.zeros(N)
+        for freq, weight in freqs_and_weights:
+            tone += weight * np.sin(2 * np.pi * freq * t)
+        peak = np.max(np.abs(tone))
+        if peak > 0:
+            tone /= peak
+        tone *= amp
+        output = np.zeros((N, self.num_channels))
+        # channel argument is 1-based
+        output[:, channel - 1] = tone
+        return output
+
+    # def play_direct_channel(self, channel, freqs_and_weights, amp):
+    #     buffer = self.generate_direct_channel_tone(
+    #         channel,
+    #         freqs_and_weights,
+    #         amp
+    #     )
+    #     if self.stream is None:
+    #         self.start_stream()
+    #     if self.stream is not None:
+    #         self.stream.write(buffer.astype('float32'))
+    #     return buffer
 
     def play_tone(self, source_pos, freq, amp):
-        """Play a tone at the specified position."""
-        # Always generate the buffer first
         buffer = self.generate_tone(source_pos, freq, amp)
 
+        # FIX: Ensure stream is started safely
         if self.stream is None:
             self.start_stream()
+
+        # Give PortAudio a split-second to bind if it was just created
+        if self.stream is None:
+            import time
+            time.sleep(0.05)
 
         if self.stream is not None:
             try:
                 self.stream.write(buffer.astype('float32'))
             except Exception as e:
                 print(f"Error writing to audio stream: {e}")
+        else:
+            print("✗ Error: Could not write audio data because stream failed to initialize.")
         return buffer
 
-    """ NEW ADDITION """
     def play_weighted_tone(self, source_pos, freqs_and_weights, amp):
         buffer = self.generate_weighted_tone(
             source_pos,
             freqs_and_weights,
             amp
         )
+
+        # FIX: Ensure stream is started safely
         if self.stream is None:
             self.start_stream()
+
+        if self.stream is None:
+            import time
+            time.sleep(0.05)
 
         if self.stream is not None:
             try:
                 self.stream.write(buffer.astype('float32'))
             except Exception as e:
                 print(f"Error writing to audio stream: {e}")
+        else:
+            print("✗ Error: Could not write audio data because stream failed to initialize.")
+        return buffer
 
+    def play_direct_channel(self, channel, freqs_and_weights, amp):
+        buffer = self.generate_direct_channel_tone(
+            channel,
+            freqs_and_weights,
+            amp
+        )
+
+        # FIX: Ensure stream is started safely
+        if self.stream is None:
+            self.start_stream()
+
+        if self.stream is None:
+            import time
+            time.sleep(0.05)
+
+        if self.stream is not None:
+            try:
+                self.stream.write(buffer.astype('float32'))
+            except Exception as e:
+                print(f"Error writing to audio stream: {e}")
+        else:
+            print("✗ Error: Could not write audio data because stream failed to initialize.")
         return buffer

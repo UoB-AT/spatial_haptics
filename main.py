@@ -1,13 +1,13 @@
 import argparse
 from scripting import *
 import numpy as np
-
+import sounddevice as sd
+from spatialiser import MultiSpeakerSpatialiser
 
 sample_rate = 48000
 tone_duration = 0.1
 itd_exaggeration = 1.0
 ild_exponent = 1.0
-
 
 def generate_tactile_tone(source_pos, freq, amp):
     """Generate a tactile tone (compatibility with original system)."""
@@ -36,14 +36,11 @@ if __name__ == "__main__":
     parser.add_argument('--device', type=int, help='Audio device ID (use --list-devices to see options)')
     args = parser.parse_args()
 
-
     device_id = args.device
 
     if args.script:
         # Execute a tactile script
         spatialiser = MultiSpeakerSpatialiser(args.config, device_id)
-
-        # Set the global spatialiser BEFORE any execute calls
         generate_tactile_tone.spatialiser = spatialiser
 
         try:
@@ -57,7 +54,7 @@ if __name__ == "__main__":
             if device_id is not None:
                 print(f"Using audio device: {device_id}")
 
-            execute(actions)
+            execute(actions, spatialiser)
 
         except Exception as e:
             print(f"Error executing script: {e}")

@@ -1,8 +1,8 @@
 import re
 import numpy as np
-from spatialiser import MultiSpeakerSpatialiser
 import time
 import main
+
 
 def is_valid_float(s):
     """Check if string is a valid float."""
@@ -33,6 +33,8 @@ def parse_script(lines):
                 ild_exponent = val
             elif key == 'tone_duration':
                 tone_duration = val
+                if hasattr(main, 'generate_tactile_tone') and hasattr(main.generate_tactile_tone, 'spatialiser'):
+                    main.generate_tactile_tone.spatialiser.set_parameters(tone_duration=val)
             continue
 
         parts = line.split()
@@ -80,7 +82,6 @@ def parse_script(lines):
                     for item in freq_string.split(','):
                         freq, weight = item.split(':')
                         freqs.append((float(freq), float(weight)))
-
                     freq = freqs
                 else:
                     freq = float(freq_string)
@@ -95,24 +96,30 @@ def parse_script(lines):
             except (ValueError, IndexError):
                 print(f"Warning: Invalid SOUND command: {line}")
                 continue
-        else:
-            print(f"Warning: Unknown command: {cmd}")
+        elif cmd == 'CHANNEL':
+            try:
+                channel = int(parts[1])
+                freq_match = re.search(r'FREQ=([0-9.,:]+)', line)
+                amp_match = re.search(r'AMP=([0-9.]+)', line)
+                duration_match = re.search(r'DURATION=([0-9.]+)', line)  # Look for duration
 
+                freq_string = freq_match.group(1)
+                freqs = []
+                for item in freq_string.split(','):
+                    freq, weight = item.split(':')
+                    freqs.append((float(freq), float(weight)))
+
+                amp = float(amp_match.group(1))
+                duration = float(duration_match.group(1)) if duration_match else None
+                actions.append(('CHANNEL', channel, freqs, amp, duration))
+            except (ValueError, IndexError, AttributeError) as e:
+                print(f"Warning: Invalid CHANNEL syntax block: {line}. Error: {e}")
+                continue
     return actions
 
 
-def execute(actions):
+def execute(actions, spatialiser):
     """Execute a sequence of parsed actions."""
-    # Use existing spatialiser if available, otherwise create one with warning
-    if hasattr(main.generate_tactile_tone, 'spatialiser') and main.generate_tactile_tone.spatialiser:
-        spatialiser = main.generate_tactile_tone.spatialiser
-        print("Using existing spatialiser configuration")
-    else:
-        print("WARNING: No spatialiser found, creating default configuration")
-        spatialiser = MultiSpeakerSpatialiser()
-        main.generate_tactile_tone.spatialiser = spatialiser
-
-    # Make sure we're not starting multiple streams
     if spatialiser.audio_engine.stream is None:
         spatialiser.start()
 
@@ -127,24 +134,43 @@ def execute(actions):
             old_duration = spatialiser.audio_engine.tone_duration
             if duration is not None:
                 spatialiser.audio_engine.tone_duration = duration
-
             try:
-                print(
-                    "Duration before play:",
-                    spatialiser.audio_engine.tone_duration
-                )
+                print("Duration before play:", spatialiser.audio_engine.tone_duration)
                 if isinstance(freq, list):
-                    spatialiser.audio_engine.play_weighted_tone(
-                        pos,
-                        freq,
-                        amp
-                    )
+                    buffer = spatialiser.audio_engine.play_weighted_tone(pos, freq, amp)
+                    tone_type = "weighted"
                 else:
-                    spatialiser.audio_engine.play_tone(
-                        pos,
-                        freq,
-                        amp
-                    )
+                    buffer = spatialiser.audio_engine.play_tone(pos, freq, amp)
+                    tone_type = "standard"
+
+                # --- FIX 1: Wait for the sound to finish playing ---
+                time.sleep(spatialiser.audio_engine.tone_duration)
+
+                timestamp = int(time.time())
+                txt_filename = f"output/audio_output_{tone_type}_{timestamp}.txt"
+                np.savetxt(txt_filename, buffer, fmt='%.6f', delimiter=',')
+                print(f"✓ Audio array saved to text file: {txt_filename}")
             finally:
                 spatialiser.audio_engine.tone_duration = old_duration
 
+        elif cmd == 'CHANNEL':
+
+            _, channel, freqs, amp, duration = act
+            old_duration = spatialiser.audio_engine.tone_duration
+
+            if duration is not None:
+                spatialiser.audio_engine.tone_duration = duration
+            try:
+                buffer = spatialiser.audio_engine.play_direct_channel(
+                    channel,
+                    freqs,
+                    amp
+                )
+
+                time.sleep(spatialiser.audio_engine.tone_duration)
+                timestamp = int(time.time())
+                txt_filename = f"output/audio_output_channel_{timestamp}.txt"
+                np.savetxt(txt_filename, buffer, fmt='%.6f', delimiter=',')
+
+            finally:
+                spatialiser.audio_engine.tone_duration = old_duration

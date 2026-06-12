@@ -207,3 +207,22 @@ class SpeakerConfig:
             }
         return channel_map
 
+    def load_from_file(self, filename):
+        try:
+            with open(filename, 'r') as f:
+                lines = f.readlines()
+            self.speakers = []
+            self.method = 'tactile_grid'
+            self.config_name = os.path.splitext(os.path.basename(filename))[0]
+            for line_num, line in enumerate(lines, 1):
+                if not self.parse_config_line(line):
+                    print(f"Error on line {line_num}: {line.strip()}")
+
+            if not self.speakers:
+                print("Warning: No speakers defined, using default 4x4 grid")
+                self.create_default_grid()
+            self.validate_channels()
+            return True
+        except Exception as e:
+            print(f"Error loading config file: {e}")
+            return False

@@ -54,64 +54,15 @@ class SpatializationEngine:
         return gains, delays
 
     def _calculate_tactile_grid(self, source_pos, speakers):
-        """Tactile grid with smooth interpolation between adjacent speakers - FIXED VERSION."""
         num_speakers = len(speakers)
         gains = np.zeros(num_speakers)
         delays = np.zeros(num_speakers)
-
-        # Calculate distances to all speakers
-        distances = np.array([np.linalg.norm(source_pos - sp) for sp in speakers])
-
-        # METHOD 1: Gaussian-based weighting for very smooth transitions
-        # This provides the smoothest transitions but may feel less "localized"
-        if hasattr(self, 'use_gaussian') and self.use_gaussian:
-            # Use Gaussian falloff for very smooth transitions
-            sigma = getattr(self, 'gaussian_sigma', 0.025)  # 25mm standard deviation - adjust for more/less smoothing
-            weights = np.exp(-(distances ** 2) / (2 * sigma ** 2))
-            gains = weights
-
-            # Power normalization to maintain consistent perceived loudness
-            total_power = np.sum(gains ** 2)
-            if total_power > 0:
-                gains = gains / np.sqrt(total_power)
-
-        else:
-            # METHOD 2: Improved inverse distance with smooth minimum (DEFAULT)
-            # Find the nearest speakers for focused spatialization
-            max_speakers = getattr(self, 'max_active_speakers', 6)  # Configurable number of active speakers
-            nearest_indices = np.argsort(distances)[:min(max_speakers, num_speakers)]
-
-            # Use smooth inverse distance weighting with larger minimum distance
-            min_dist = getattr(self, 'smooth_min_distance', 0.008)  # 8mm minimum distance for smoother transitions
-            distance_power = getattr(self, 'distance_power', 1.5)  # Power for distance falloff
-
-            # Calculate weights for nearest speakers only
-            total_weight = 0
-            for idx in nearest_indices:
-                dist = distances[idx]
-                # Smooth inverse distance - less sharp than 1/d
-                weight = 1.0 / ((dist + min_dist) ** distance_power)
-                gains[idx] = weight
-                total_weight += weight
-
-            # Normalize weights to sum to 1
-            if total_weight > 0:
-                for idx in nearest_indices:
-                    gains[idx] /= total_weight
-
-            # Apply gentle overall tactile enhancement to all active speakers
-            # This maintains tactile sensation without creating bias
-            active_mask = gains > 0.001
-            if np.any(active_mask):
-                # Gentle enhancement: boost all active speakers slightly
-                enhancement = getattr(self, 'tactile_enhancement', 1.2)  # Much gentler than the previous 4.0
-                gains[active_mask] *= enhancement
-
-                # Power normalization to prevent clipping and maintain consistency
-                total_power = np.sum(gains ** 2)
-                if total_power > 1.0:
-                    gains = gains / np.sqrt(total_power)
-
+        distances = np.array([
+            np.linalg.norm(source_pos - sp)
+            for sp in speakers
+        ])
+        nearest_idx = np.argmin(distances)
+        gains[nearest_idx] = 1.0
         return gains, delays
 
     def set_tactile_grid_parameters(self, **kwargs):

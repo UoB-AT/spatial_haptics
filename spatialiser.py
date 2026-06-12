@@ -20,7 +20,7 @@ class MultiSpeakerSpatialiser:
         itd_exaggeration = self.audio_engine.spat_engine.itd_exaggeration
         ild_exponent = self.audio_engine.spat_engine.ild_exponent
 
-        self.print_startup_info()
+        #self.print_startup_info()
 
     def load_config(self, config_file):
         """Load configuration from file."""
