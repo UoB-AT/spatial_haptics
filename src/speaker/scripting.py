@@ -1,7 +1,7 @@
 import re
 import numpy as np
 import time
-import main
+
 
 
 def is_valid_float(s):
@@ -13,7 +13,7 @@ def is_valid_float(s):
         return False
 
 
-def parse_script(lines):
+def parse_script(lines, spatialiser=None):
     """Parse a script file and return a list of action tuples."""
     actions = []
     global itd_exaggeration, ild_exponent, tone_duration
@@ -33,8 +33,12 @@ def parse_script(lines):
                 ild_exponent = val
             elif key == 'tone_duration':
                 tone_duration = val
-                if hasattr(main, 'generate_tactile_tone') and hasattr(main.generate_tactile_tone, 'spatialiser'):
-                    main.generate_tactile_tone.spatialiser.set_parameters(tone_duration=val)
+                # if hasattr(main, 'generate_tactile_tone') and hasattr(main.generate_tactile_tone, 'spatialiser'):
+                    # main.generate_tactile_tone.spatialiser.set_parameters(tone_duration=val)
+                if spatialiser is not None:
+                    spatialiser.set_parameters(
+                        tone_duration=val
+                    )
             continue
 
         parts = line.split()

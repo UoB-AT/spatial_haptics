@@ -1,7 +1,7 @@
 import threading
 import sounddevice as sd
 import numpy as np
-from spatialisation import SpatializationEngine
+from .spatialisation import SpatializationEngine
 
 
 class MultiSpeakerAudioEngine:

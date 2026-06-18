@@ -1,8 +1,8 @@
 import argparse
-from scripting import *
+from speaker.scripting import *
 import numpy as np
 import sounddevice as sd
-from spatialiser import MultiSpeakerSpatialiser
+from speaker.spatialiser import MultiSpeakerSpatialiser
 
 sample_rate = 48000
 tone_duration = 0.1
@@ -30,6 +30,7 @@ def generate_tactile_tone(source_pos, freq, amp):
         return np.column_stack([left, right])
 
 if __name__ == "__main__":
+    print("hello")
     parser = argparse.ArgumentParser(description='Multi-Speaker Spatialiser with FIXED Device Selection')
     parser.add_argument('script', nargs='?', help='Tactile script file to execute')
     parser.add_argument('--config', help='Speaker configuration file')
@@ -47,7 +48,7 @@ if __name__ == "__main__":
             with open(args.script, 'r') as f:
                 lines = f.read().splitlines()
 
-            actions = parse_script(lines)
+            actions = parse_script(lines, spatialiser)
             print(f"Executing script: {args.script}")
             print(f"Actions: {len(actions)}")
             print(f"Using configuration: {spatialiser.speaker_config.config_name}")
