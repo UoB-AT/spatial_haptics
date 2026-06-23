@@ -39,7 +39,7 @@ if __name__ == "__main__":
     parser.add_argument('--device', type=int, help='Audio device ID (use --list-devices to see options)')
     parser.add_argument("--filename", type=str, default= "data/recording.wav", help="Filename of saved recording")
     parser.add_argument("--duration", type=float, default=10, help="Total duration of recording in seconds")
-    parser.add_argument("--samplerate", type=float, default=96000, help="sampling rate of recording in Hz (96000 by default)")
+    parser.add_argument("--samplerate", type=float, default=48000, help="sampling rate of recording in Hz (96000 by default)")
     args = parser.parse_args()
 
     device_id = args.device
@@ -54,6 +54,7 @@ if __name__ == "__main__":
                 lines = f.read().splitlines()
 
             actions = parse_script(lines, spatialiser)
+
             print(f"Executing script: {args.script}")
             print(f"Using configuration: {spatialiser.speaker_config.config_name}")
             if device_id is not None:
@@ -62,7 +63,8 @@ if __name__ == "__main__":
             record_thread = threading.Thread(target=record, args=(args.duration, args.filename, args.samplerate))
             print("✓ Start Recording")
             record_thread.start()
-            time.sleep(0.5) # wait 1 s and then start playing the audio
+            time.sleep(0.5) # wait 0.5 s and then start playing the audio
+
             execute(actions, spatialiser)
             print("✓ Playback finished")
             print("✓ Waiting for recording to finish")
