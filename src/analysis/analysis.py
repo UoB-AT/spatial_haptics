@@ -32,21 +32,7 @@ def analyse_folder(folder, f_command):
         "frequency_std": np.std(frequencies),
         "rms_mean": np.mean(rms_values),
         "rms_std": np.std(rms_values),
-        "n": len(frequencies)
+        "n": len(frequencies),
+        "individual_frequencies": frequencies,
     }
 
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument("--filepath")
-#     parser.add_argument("--fcommand", type=float, required=True)
-#     args = parser.parse_args()
-#     if os.path.isdir(args.filepath):
-#         result = analyse_folder(args.filepath, args.fcommand)
-#         print(f"Mean Frequency: " f"{result['frequency_mean']:.2f} Hz")
-#         print(f"Frequency Std: " f"{result['frequency_std']:.2f} Hz")
-#         print(f"Mean RMS: " f"{result['rms_mean']:.6f}")
-#         print(f"RMS Std: " f"{result['rms_std']:.6f}")
-#     else:
-#         result = analyse(args.filepath, args.fcommand)
-#         print(f"Dominant Frequency: {result['f_peak']:.2f} Hz")
-#         print(f"RMS Amplitude: {result['rms']:.6f}")

@@ -1,3 +1,6 @@
+"""
+Plotting all spectrum and time series for a certain frequency
+"""
 from src.analysis.analysis import analyse_folder
 from src.analysis.plotting import plot_FFT, fit_peak_frequency, plot_time_series
 from src.analysis.wav_io import read_wav
@@ -5,7 +8,6 @@ from src.analysis.features import find_candidate_peaks, merge_peaks
 from src.analysis.fft import FFT, extract_time_window
 import argparse
 import os
-
 
 
 # frequency shift

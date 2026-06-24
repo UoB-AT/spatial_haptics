@@ -1,13 +1,13 @@
 #!/bin/bash
 
-for freq in 50 60 70 80 90 100 1
+for freq in 175 200
 do
     for rep in {1..5}
     do
         cat > temp.txt << EOF
 
-itd_exaggeration = 4.0
-ild_exponent = 2.0
+# itd_exaggeration = 4.0
+# ild_exponent = 2.0
 
 CHANNEL 1 FREQ=${freq}:1.0 AMP=0.1 DURATION=7.0
 WAIT 10.0
