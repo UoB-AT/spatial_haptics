@@ -1,21 +1,34 @@
 #!/bin/bash
 
-for freq in 175 200
+count=0
+
+while [ $count -lt 23 ]
 do
-    for rep in {1..5}
-    do
-        cat > temp.txt << EOF
+    freq=$(python -c "import random; print(f'{random.uniform(200,250):.1f}')")
 
-# itd_exaggeration = 4.0
-# ild_exponent = 2.0
+    amp=0.1
+    amp_label=1
 
-CHANNEL 1 FREQ=${freq}:1.0 AMP=0.1 DURATION=7.0
+    TARGET_DIR="data/25Jun/${freq}Hz_amp${amp_label}"
+
+    if [ -d "$TARGET_DIR" ]; then
+        echo "Skipping existing $TARGET_DIR"
+        continue
+    fi
+
+    mkdir -p "$TARGET_DIR"
+
+    cat > temp.txt << EOF
+CHANNEL 1 FREQ=${freq}:1.0 AMP=${amp} DURATION=7.0
 WAIT 10.0
 EOF
 
-        python src/main.py \
-            temp.txt \
-            --filename data/23Jun/${freq}Hz/${freq}_amp1_rep${rep}.wav \
-            --duration 6
-    done
+    python src/main.py \
+        temp.txt \
+        --filename "${TARGET_DIR}/${freq}_amp${amp_label}_rep${rep}.wav" \
+        --duration 6
+
+    ((count++))
 done
+
+rm -f temp.txt

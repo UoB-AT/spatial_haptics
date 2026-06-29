@@ -36,8 +36,8 @@ if __name__ == "__main__":
     parser.add_argument("--folder", required=True)
     parser.add_argument("--actual_frequency", type=float, required=True)
     parser.add_argument("--plot", action="store_true")
-    parser.add_argument("--tstart", type=float, default=1.0)
-    parser.add_argument("--tend", type=float, default=3.0)
+    parser.add_argument("--tstart", type=float, default=2.0)
+    parser.add_argument("--tend", type=float, default=4.0)
 
     args = parser.parse_args()
     run(args.folder, args.actual_frequency)

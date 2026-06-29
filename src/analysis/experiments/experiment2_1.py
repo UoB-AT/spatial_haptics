@@ -7,6 +7,7 @@ import argparse
 import os
 import re
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 
@@ -16,7 +17,7 @@ def extract_frequency_from_foldername(folder_name):
         return float(match.group(1))
     return None
 
-def run_analysis_and_plot(parent_folder, tstart, tend):
+def run_analysis(parent_folder, tstart, tend):
     commanded_frequencies = []
     measured_frequencies = []
     subfolders = os.listdir(parent_folder)
@@ -34,7 +35,7 @@ def run_analysis_and_plot(parent_folder, tstart, tend):
         if not os.path.isdir(folder_path):
             continue
         try:
-            result = analyse_folder(folder_path, actual_freq)
+            result = analyse_folder(folder_path, actual_freq, tstart, tend)
             individual_freqs = result["individual_frequencies"]
 
             for freq in individual_freqs:
@@ -43,36 +44,34 @@ def run_analysis_and_plot(parent_folder, tstart, tend):
 
         except Exception as e:
             print(f"Error processing folder {subfolder}: {e}")
+    idx = np.argsort(commanded_frequencies)
+    commanded_frequencies = np.array(commanded_frequencies)[idx]
+    measured_frequencies = np.array(measured_frequencies)[idx]
+    return commanded_frequencies, measured_frequencies
 
-    if commanded_frequencies:
-        plot(commanded_frequencies, measured_frequencies)
 
+def plot_all(folders, tstart, tend):
+    plt.figure(figsize=(6,6))
+    plt.plot([50,250], [50,250], 'k--', linewidth=0.5)
 
-def plot(command_frequencies, measured_frequencies):
-
-    plt.figure(figsize=(5,5))
-
-    min_f = min(min(command_frequencies), min(measured_frequencies))
-    max_f = max(max(command_frequencies), max(measured_frequencies))
-
-    plt.plot([min_f, max_f], [min_f, max_f], 'k--', color='black', linewidth=0.5)
-
-    plt.scatter(command_frequencies, measured_frequencies, marker='x')
-
-    plt.xlabel('Commanded Frequency (Hz)')
-    plt.ylabel('Measured Frequency (Hz)')
-
+    for i, folder in enumerate(folders):
+        command, measured = run_analysis(folder, tstart, tend)
+        plt.scatter(command, measured, marker='.', color='g')
+    plt.xlabel("Commanded Frequency (Hz)")
+    plt.ylabel("Measured Frequency (Hz)")
+    plt.legend()
     plt.tight_layout()
     plt.show()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--parent_folder", required=True, help="Path to the directory containing frequency subfolders")
+    parser.add_argument("--parent_folder", help="Path to the directory containing frequency subfolders")
     parser.add_argument("--plot_individual", action="store_true",
                         help="Analyze and print peak data for individual WAV files")
     parser.add_argument("--tstart", type=float, default=2.0)
     parser.add_argument("--tend", type=float, default=4.0)
+    parser.add_argument("--parent_folders", nargs="+", help="Path to the folder containing WAV files")
 
     args = parser.parse_args()
-    run_analysis_and_plot(args.parent_folder, args.tstart, args.tend)
+    plot_all(args.parent_folders, args.tstart, args.tend)
