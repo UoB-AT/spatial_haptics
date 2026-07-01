@@ -12,8 +12,8 @@ import os
 
 # frequency shift
 
-def run(folder, actual_frequency):
-    result = analyse_folder(folder, actual_frequency)
+def run(folder, actual_frequency, tstart, tend):
+    result = analyse_folder(folder, actual_frequency, tstart, tend)
     mean_frequency = result['frequency_mean']
     std_frequency = result["frequency_std"]
 
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     parser.add_argument("--tend", type=float, default=4.0)
 
     args = parser.parse_args()
-    run(args.folder, args.actual_frequency)
+    run(args.folder, args.actual_frequency, args.tstart, args.tend)
     if args.plot:
         wav_files = [f for f in os.listdir(args.folder) if f.endswith(".wav")]
         for i in range(len(wav_files)):

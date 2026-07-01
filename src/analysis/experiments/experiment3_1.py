@@ -1,7 +1,6 @@
 """
 Parity plot for commanded and measured amplitude
 """
-from scipy import datasets
 
 from src.analysis.analysis import analyse_folder
 import argparse
@@ -51,34 +50,33 @@ def run_analysis(parent_folder, tstart, tend):
     return commanded_amplitudes, measured_rms, std_rms
 
 
-def plot_all(folders, tstart, tend):
+def plot_all(folders, labels, tstart, tend):
 
     plt.figure(figsize=(5,5))
 
-    freq_labels = [50, 75, 100, 125, 150, 180]
-
-    #plt.plot([0,1], [0,1], 'k--', color='black', linewidth=0.5)
+    plt.plot([0,1], [0,1], 'k--', color='black', linewidth=0.5)
     for i, folder in enumerate(folders):
         command, rms, rms_std = run_analysis(folder, tstart, tend)
         command_norm = command / np.max(command)
         rms_norm = rms / np.max(rms)
-        plt.errorbar(command_norm, rms_norm, yerr=rms_std/np.max(rms), fmt='.', capsize=3, label=f"{freq_labels[i]} Hz")
+        plt.errorbar(command_norm, rms_norm, yerr=rms_std/np.max(rms), fmt='.', label=f"{labels[i]} Hz")
 
     plt.xlabel('Commanded Amplitude (a.u.)')
     plt.ylabel('Normalised Measured Amplitude (a.u.)')
-    #plt.legend()
+    plt.legend()
     plt.tight_layout()
     plt.show()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--parent_folder", help="Path to the directory containing frequency subfolders")
-    parser.add_argument("--plot_individual", action="store_true",
-                        help="Analyze and print peak data for individual WAV files")
-    parser.add_argument("--parent_folders",  nargs="+", help="Path to the directories containing frequency subfolders")
+    # parser.add_argument("--parent_folder", help="Path to the directory containing frequency subfolders")
+    # parser.add_argument("--plot_individual", action="store_true",
+    #                     help="Analyze and print peak data for individual WAV files")
+    parser.add_argument("--parent_folders",  nargs="+", required= True, help="Path to the directories containing frequency subfolders")
     parser.add_argument("--tstart", type=float, default=2.0)
     parser.add_argument("--tend", type=float, default=4.0)
+    parser.add_argument("--labels", nargs="+", type=float, required=True, help="Labels for each dataset (e.g. frequencies)")
 
     args = parser.parse_args()
-    plot_all(args.parent_folders, args.tstart, args.tend)
+    plot_all(args.parent_folders, args.labels, args.tstart, args.tend)

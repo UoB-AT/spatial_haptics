@@ -3,7 +3,8 @@ from .fft import dominant_frequency, extract_time_window
 from .features import RMS_energy
 import numpy as np
 import os
-import argparse
+from scipy.signal import hilbert
+from scipy.signal import butter, filtfilt
 
 def analyse(filepath, f_command, tstart, tend):
     data, meta = read_wav(filepath)
@@ -38,3 +39,41 @@ def analyse_folder(folder, f_command, tstart, tend):
         "individual_rms": rms_values
     }
 
+def analyse_HT(filepath, tstart, tend):
+    data, meta = read_wav(filepath)
+    fs = meta["sample_rate"]
+    ### add high pass filtering
+    cutoff_freq = 20
+    order = 4
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff_freq / nyq
+    b, a = butter(order, normal_cutoff, btype='highpass')
+    ###
+    data = extract_time_window(data, fs, tstart, tend)
+    data = filtfilt(b, a, data) # filtered
+    analytic_signal= hilbert(data)
+    envelope = np.abs(analytic_signal)
+    phase = np.unwrap(np.angle(analytic_signal))
+    frequency = np.diff(phase) / (2.0 * np.pi) * fs
+    return {"fs": fs,
+            "envelope": envelope,
+            "envelope_mean": np.mean(envelope),
+            "envelope_std": np.std(envelope),
+            "phase": phase,
+            "instantaneous_frequency": frequency
+            }
+
+
+def analyse_folder_HT(folder_path, tstart, tend):
+    envelope_means = []
+    envelope_stds = []
+    for filename in os.listdir(folder_path):
+        if not filename.endswith(".wav"):
+            continue
+        filepath = os.path.join(folder_path, filename)
+        result = analyse_HT(filepath, tstart, tend)
+        envelope_means.append(result["envelope_mean"])
+        envelope_stds.append(result["envelope_std"])
+    return {"envelope_mean": np.mean(envelope_means),
+        "envelope_std": np.std(envelope_means)
+        }
