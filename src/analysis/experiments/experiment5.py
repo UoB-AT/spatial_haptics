@@ -1,17 +1,15 @@
 """
-Envelop Analysis (Hilbert Transform) - Try out
+Envelop Analysis (Hilbert Transform) - Try out (for a single plot)
 """
 
 from src.analysis.analysis import analyse_HT
 import matplotlib.pyplot as plt
-from src.analysis.fft import extract_time_window
-from src.analysis.wav_io import read_wav
 import argparse
 import numpy as np
 from scipy.signal import find_peaks
 
 
-def find_peak_envelop(envelope, fs, command_frequency, plot=False):
+def find_peak_envelope(envelope, fs, command_frequency, plot=False):
     dis = int(fs / command_frequency)
     peaks, _ = find_peaks(envelope, distance=dis)
     time = np.arange(len(envelope)) / fs
@@ -24,21 +22,65 @@ def find_peak_envelop(envelope, fs, command_frequency, plot=False):
     return peaks, envelope[peaks]
 
 
-def exp_envelop_plot(peaks, peak_values, fs, duration):
-    peak_times = peaks / fs
-    ### search for overshoot
-    search_time = 1.0  # seconds
+def find_overshoot(peaks, envelope_peaks, fs, search_time=1.0):
     search_idx = np.where(peaks / fs <= search_time)[0]
-    start_idx = search_idx[np.argmax(envelope_peaks[search_idx])]
-    ###
-    start_time = peak_times[start_idx]
-    mask = ((peak_times >= start_time) & (peak_times <= start_time + duration))
+    overshoot_idx = search_idx[np.argmax(envelope_peaks[search_idx])]
+    return overshoot_idx
 
+def compute_delta(envelope_peaks, window=20):
+    moving_mean = np.convolve(envelope_peaks, np.ones(window) / window, mode="valid")
+    delta = np.abs(np.diff(moving_mean))
+    return moving_mean, delta
+
+def estimate_threshold(delta, samples=20):
+    mid = len(delta) // 2
+    region = delta[mid - samples // 2 : mid + samples // 2]
+    threshold = np.mean(region) + 2 * np.std(region)
+    return threshold
+
+
+def find_steady_state(delta, overshoot_idx, threshold, window=20, consecutive=20):
+    for i in range(overshoot_idx, len(delta) - consecutive):
+        if np.all(delta[i:i+consecutive] < threshold):
+            return i + window // 2
+    return None
+
+def plot_delta(peaks, delta, threshold, fs, window):
+    time = peaks / fs
+    time_mean = time[window - 1:]
+    time_delta = time_mean[1:]
+    plt.figure(figsize=(8,4))
+    plt.plot(time_delta, delta)
+    plt.axhline(threshold, color="r", linestyle="--")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Δ Moving Mean")
+    plt.tight_layout()
+    plt.show()
+
+def find_unsteady_duration(peaks, envelope_peaks, fs, window=20, consecutive=20, plot=False):
+    moving_mean, delta = compute_delta(envelope_peaks, window)
+    threshold = estimate_threshold(delta)
+    overshoot_idx = find_overshoot(peaks, envelope_peaks, fs)
+    steady_start = find_steady_state(delta, overshoot_idx, threshold, window, consecutive)
+    if plot:
+        plot_delta(peaks, delta, threshold, fs, window,)
+
+    settle_time = (peaks[steady_start] - peaks[overshoot_idx]) / fs
+    return settle_time
+
+
+
+def exp_envelop_plot(peaks, peak_values, fs, duration, plot=False):
+    if not plot:
+        return
+    overshoot_idx = find_overshoot(peaks, peak_values, fs)
+    peak_times = peaks / fs
+    start_time = peak_times[overshoot_idx]
+    mask = ((peak_times >= start_time) & (peak_times <= start_time + duration))
     selected_times = peak_times[mask] - start_time
-    selected_peaks = peak_values[mask]
-    selected_peaks = selected_peaks / selected_peaks[0]
+    selected_peaks = peak_values[mask] / peak_values[overshoot_idx]
+
     ln_peaks = np.log(selected_peaks)
-    #ln_peaks = selected_peaks
     plt.figure(figsize=(6,4))
     plt.plot(selected_times, ln_peaks, '.')
     plt.xlabel("Time after overshoot (s)")
@@ -48,41 +90,41 @@ def exp_envelop_plot(peaks, peak_values, fs, duration):
 
 
 ### try another method
-def find_unsteady_duration(peaks, envelope_peaks, fs):
-    window = 20
-    # Mean amplitude over each window
-    moving_mean = np.convolve(envelope_peaks, np.ones(window) / window, mode="valid")
-    delta = np.abs(np.diff(moving_mean))
-    # get the data in the middle (so it will be in steady state)
-    mid = len(delta) // 2
-    steady_delta = delta[mid-10: mid+10]
-
-    threshold = np.mean(steady_delta) + 2 * np.std(steady_delta)
-    ### search for overshoot
-    search_time = 1.0  # seconds
-    search_idx = np.where(peaks / fs <= search_time)[0]
-    overshoot_idx = search_idx[np.argmax(envelope_peaks[search_idx])]
-    ###
-    print("mean =", np.mean(steady_delta))
-    print("std  =", np.std(steady_delta))
-    print("threshold =", threshold)
-    N = 20 # number of consecutive windows
-    steady_start = None
-    for i in range(overshoot_idx, len(delta) - N):
-        if np.all(delta[i:i + N] < threshold):
-            steady_start = i + window // 2
-            break
-    print("Steady starts at peak:", steady_start)
-    time = peaks / fs
-    time_mean = time[window - 1:]
-    plt.figure(figsize=(10, 4))
-    time_delta = time_mean[1:]
-    plt.plot(time_delta, delta)
-    plt.axhline(threshold, color='r', linestyle='--')
-    plt.xlabel("Time (s)")
-    plt.ylabel("Change in moving mean")
-    plt.show()
-    return (peaks[steady_start] - peaks[overshoot_idx]) / fs
+# def find_unsteady_duration(peaks, envelope_peaks, fs):
+#     window = 20
+#     # Mean amplitude over each window
+#     moving_mean = np.convolve(envelope_peaks, np.ones(window) / window, mode="valid")
+#     delta = np.abs(np.diff(moving_mean))
+#     # get the data in the middle (so it will be in steady state)
+#     mid = len(delta) // 2
+#     steady_delta = delta[mid-10: mid+10]
+#
+#     threshold = np.mean(steady_delta) + 2 * np.std(steady_delta)
+#     ### search for overshoot
+#     search_time = 1.0  # seconds
+#     search_idx = np.where(peaks / fs <= search_time)[0]
+#     overshoot_idx = search_idx[np.argmax(envelope_peaks[search_idx])]
+#     ###
+#     print("mean =", np.mean(steady_delta))
+#     print("std  =", np.std(steady_delta))
+#     print("threshold =", threshold)
+#     N = 20 # number of consecutive windows
+#     steady_start = None
+#     for i in range(overshoot_idx, len(delta) - N):
+#         if np.all(delta[i:i + N] < threshold):
+#             steady_start = i + window // 2
+#             break
+#     print("Steady starts at peak:", steady_start)
+#     time = peaks / fs
+#     time_mean = time[window - 1:]
+#     plt.figure(figsize=(10, 4))
+#     time_delta = time_mean[1:]
+#     plt.plot(time_delta, delta)
+#     plt.axhline(threshold, color='r', linestyle='--')
+#     plt.xlabel("Time (s)")
+#     plt.ylabel("Change in moving mean")
+#     plt.show()
+#     return (peaks[steady_start] - peaks[overshoot_idx]) / fs
 
 def plot_HT(envelope, frequency):
     time = np.arange(len(envelope)) / fs
@@ -116,13 +158,7 @@ if __name__ == "__main__":
     frequency= result["instantaneous_frequency"]
     fs = result["fs"]
 
-
-    if args.plot:
-        plot_HT(envelope, frequency)
-
-    peaks, envelope_peaks = find_peak_envelop(envelope, fs, args.commanded_freq) #change to commanded frequency
-    exp_envelop_plot(peaks, envelope_peaks, fs, args.duration)
-    settle_time = find_unsteady_duration(peaks, envelope_peaks, fs)
-    print("settle_time:", settle_time)
-
-
+    peaks, envelope_peaks = find_peak_envelope(envelope, fs, args.commanded_freq, plot=args.plot)
+    exp_envelop_plot(peaks, envelope_peaks, fs, args.duration, plot=args.plot)
+    settle_time = find_unsteady_duration(peaks, envelope_peaks, fs, plot=args.plot)
+    print(f"Settling time: {settle_time:.3f} s")
